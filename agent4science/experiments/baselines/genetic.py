@@ -1,5 +1,7 @@
 """Genetic Algorithm (NSGA-II style) baseline for inverse design."""
 
+from __future__ import annotations
+
 import numpy as np
 import torch
 

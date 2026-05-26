@@ -1,5 +1,7 @@
 """Physical constraints and equations for acoustic metamaterials."""
 
+from __future__ import annotations
+
 import numpy as np
 
 # Speed of sound in air (m/s)
@@ -19,15 +21,15 @@ N_FREQ_POINTS = 100
 # Indices 25-26: Layer thickness ratios (2 params)
 # Indices 27-30: Perforation ratios (4 params)
 PARAM_LABELS = [
-    "L1_Cav1", "L1_Cav2", "L1_Cav3", "L1_Cav4",
-    "L1_Cav5", "L1_Cav6", "L1_Cav7", "L1_Cav8",
-    "L2_Cav1", "L2_Cav2", "L2_Cav3", "L2_Cav4",
-    "L2_Cav5", "L2_Cav6", "L2_Cav7", "L2_Cav8",
-    "Pore1", "Pore2", "Pore3", "Pore4",
-    "Pore5", "Pore6", "Pore7", "Pore8",
+    "L1_Cav0", "L1_Cav1", "L1_Cav2", "L1_Cav3",
+    "L1_Cav4", "L1_Cav5", "L1_Cav6", "L1_Cav7",
+    "L2_Cav0", "L2_Cav1", "L2_Cav2", "L2_Cav3",
+    "L2_Cav4", "L2_Cav5", "L2_Cav6", "L2_Cav7",
+    "Pore0", "Pore1", "Pore2", "Pore3",
+    "Pore4", "Pore5", "Pore6", "Pore7",
     "Thickness",
-    "Ratio1", "Ratio2",
-    "Perf1", "Perf2", "Perf3", "Perf4",
+    "Ratio0", "Ratio1",
+    "Perf0", "Perf1", "Perf2", "Perf3",
 ]
 
 THICKNESS_INDEX = 24
@@ -35,20 +37,15 @@ N_PARAMS = 31
 
 # Physical bounds for each parameter (min, max) in mm or ratio
 PARAM_BOUNDS = np.array([
-    [1.0, 100.0],   # Cavity depths (8x layer 1)
+    [1.0, 100.0], [1.0, 100.0], [1.0, 100.0], [1.0, 100.0],  # Cavity depths L1 (8)
     [1.0, 100.0], [1.0, 100.0], [1.0, 100.0], [1.0, 100.0],
+    [1.0, 100.0], [1.0, 100.0], [1.0, 100.0], [1.0, 100.0],  # Cavity depths L2 (8)
     [1.0, 100.0], [1.0, 100.0], [1.0, 100.0], [1.0, 100.0],
-    [1.0, 100.0],   # Cavity depths (8x layer 2)
-    [1.0, 100.0], [1.0, 100.0], [1.0, 100.0], [1.0, 100.0],
-    [1.0, 100.0], [1.0, 100.0], [1.0, 100.0], [1.0, 100.0],
-    [1.0, 80.0],    # Pore sizes
-    [1.0, 80.0], [1.0, 80.0], [1.0, 80.0],
-    [1.0, 80.0], [1.0, 80.0], [1.0, 80.0], [1.0, 80.0],
-    [30.0, 300.0],  # Total thickness (mm)
-    [1.0, 100.0],   # Layer ratios
-    [1.0, 100.0],
-    [1.0, 50.0],    # Perforation ratios
-    [1.0, 50.0], [1.0, 50.0], [1.0, 50.0],
+    [1.0, 80.0], [1.0, 80.0], [1.0, 80.0], [1.0, 80.0],       # Pore sizes (4)
+    [1.0, 80.0], [1.0, 80.0], [1.0, 80.0], [1.0, 80.0],       # Pore sizes (4)
+    [30.0, 300.0],                                              # Total thickness
+    [1.0, 100.0], [1.0, 100.0],                                 # Layer ratios (2)
+    [1.0, 50.0], [1.0, 50.0], [1.0, 50.0], [1.0, 50.0],       # Perforation ratios (4)
 ])
 
 

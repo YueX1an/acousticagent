@@ -97,7 +97,7 @@ def load_model(device: torch.device | None = None) -> ResNetDNN:
         model.load_state_dict(state_dict)
         print(f"  Model loaded from: {DEFAULT_MODEL_PATH}")
     else:
-        print(f"  ⚠️  Model file not found: {DEFAULT_MODEL_PATH}")
+        print(f"  [WARN] Model file not found: {DEFAULT_MODEL_PATH}")
         print("  Using RANDOM weights (demonstration mode)")
 
     model.to(device)
@@ -242,7 +242,7 @@ def run_benchmark():
                     "worst_band_absorption": metrics.get("worst_band_absorption", 0),
                 })
             except Exception as e:
-                print(f"  ❌ Error: {e}")
+                print(f"  [ERROR] {e}")
                 results.append({
                     "task": task_id,
                     "method": method,
@@ -257,7 +257,7 @@ def run_benchmark():
             writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(results)
-        print(f"\n📊 Benchmark results saved: {csv_path}")
+        print(f"\n[SAVED] Benchmark results: {csv_path}")
 
         # Print summary table
         print(f"\n{'Task':<16} {'Method':<22} {'Avg Abs':>8} {'Peak Abs':>8} {'BW 0.8':>8} {'Worst Band':>10}")

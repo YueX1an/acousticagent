@@ -60,7 +60,7 @@ def plot_spectrum(spectrum: np.ndarray, title: str = "Absorption Spectrum",
     if save_path:
         os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"  📊 Saved: {save_path}")
+        print(f"  Saved: {save_path}")
 
     if show:
         plt.show()
@@ -104,7 +104,7 @@ def plot_multi_agent_progress(round_log: list[dict],
 
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"  📊 Saved: {save_path}")
+        print(f"  Saved: {save_path}")
 
     if show:
         plt.show()

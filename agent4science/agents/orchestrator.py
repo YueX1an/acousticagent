@@ -1,5 +1,7 @@
 """Orchestrator: coordinates multi-agent debate and refinement loops."""
 
+from __future__ import annotations
+
 import json
 import time
 from dataclasses import dataclass, field
@@ -151,7 +153,7 @@ class Orchestrator:
             # Check convergence
             if verdict == "pass":
                 if self.config.verbose:
-                    print(f"\n✅ Convergence achieved at round {round_id}!")
+                    print(f"\n[OK] Convergence achieved at round {round_id}!")
                 break
 
             # Prepare critic feedback for next round
@@ -167,7 +169,7 @@ class Orchestrator:
                 curr_best = design.get("metrics", {}).get("avg_absorption", 0)
                 if abs(curr_best - prev_best) < self.config.convergence_threshold:
                     if self.config.verbose:
-                        print(f"  ⚠️ Improvement stalled (delta={curr_best - prev_best:.5f})")
+                        print(f"  [WARN] Improvement stalled (delta={curr_best - prev_best:.5f})")
                     # Force one more round then stop
                     if len(self._round_log) >= 2:
                         if self.config.verbose:

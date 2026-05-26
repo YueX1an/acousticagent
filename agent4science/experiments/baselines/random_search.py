@@ -1,5 +1,7 @@
 """Random search baseline for inverse design."""
 
+from __future__ import annotations
+
 import numpy as np
 import torch
 

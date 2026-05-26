@@ -1,5 +1,7 @@
 """Gradient-based inverse design optimization."""
 
+from __future__ import annotations
+
 import numpy as np
 import torch
 import torch.optim as optim
