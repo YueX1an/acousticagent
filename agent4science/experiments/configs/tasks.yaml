@@ -1,0 +1,51 @@
+# Task definitions for benchmark evaluation
+# Each task specifies design requirements and target metrics
+
+tasks:
+  - id: "broadband"
+    name: "Broadband Absorber"
+    description: "Standard broadband absorber, 0-2000 Hz, 120mm thickness"
+    target_thickness_mm: 120
+    optimization_goal: "maximize_avg"
+    target_spec:
+      min_avg_absorption: 0.70
+      min_peak_absorption: 0.90
+      min_band_absorption: 0.60
+      min_bandwidth_0.8: 400
+    init_strategy: "default"
+
+  - id: "low_frequency"
+    name: "Low-Frequency Absorber"
+    description: "Absorption focused on 0-500 Hz range, 150mm thickness"
+    target_thickness_mm: 150
+    optimization_goal: "maximize_peak"
+    target_spec:
+      min_avg_absorption: 0.50
+      min_peak_absorption: 0.85
+      min_band_absorption: 0.40
+      min_bandwidth_0.8: 200
+    init_strategy: "theory_guided"
+
+  - id: "multi_band"
+    name: "Multi-Band Absorber"
+    description: "Dual-band absorption at ~500 Hz and ~1500 Hz, 120mm thickness"
+    target_thickness_mm: 120
+    optimization_goal: "maximize_avg"
+    target_spec:
+      min_avg_absorption: 0.60
+      min_peak_absorption: 0.85
+      min_band_absorption: 0.50
+      min_bandwidth_0.8: 300
+    init_strategy: "theory_guided"
+
+  - id: "ultra_thin"
+    name: "Ultra-Thin Absorber"
+    description: "Absorber with extreme thickness constraint (50mm)"
+    target_thickness_mm: 50
+    optimization_goal: "maximize_avg"
+    target_spec:
+      min_avg_absorption: 0.40
+      min_peak_absorption: 0.75
+      min_band_absorption: 0.30
+      min_bandwidth_0.8: 150
+    init_strategy: "random"
