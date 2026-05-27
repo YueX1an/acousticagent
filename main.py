@@ -1,12 +1,14 @@
 #!/usr/bin/env python
-"""Main entry point for the Multi-Agent Scientific Inverse Design system.
+"""LLM-Guided Inverse Design — Main Entry Point.
 
 Usage:
-    python main.py                          # Run interactive multi-agent design
-    python main.py --task broadband         # Run a specific design task
-    python main.py --benchmark              # Run all benchmarks
-    python main.py --baseline random_search --task broadband  # Run baseline
+    python main.py --domain acoustic --critic llm
+    python main.py --domain airfoil --critic heuristic   # ablation
+    python main.py --benchmark                            # full suite
+    python main.py --baseline ga --domain acoustic        # GA baseline only
 """
+
+from __future__ import annotations
 
 import argparse
 import json
@@ -17,304 +19,353 @@ import time
 import numpy as np
 import torch
 
+from agent4science.domain_spec import load_domain, DomainSpec
 from agent4science.models import ResNetDNN
-from agent4science.agents.designer_agent import DesignerAgent
-from agent4science.agents.critic_agent import CriticAgent
+from agent4science.agents.designer import Designer
 from agent4science.agents.orchestrator import Orchestrator, OrchestratorConfig
-from agent4science.tools.visualize import plot_spectrum, plot_multi_agent_progress
-from agent4science.utils.metrics import compute_all_metrics
-
-# ─── Configuration ───────────────────────────────────────────────────────────
-
-DEFAULT_MODEL_PATH = os.path.join("saved_models_dnn_v2", "ResNet_PeakFocus.pth")
-MODEL_ARGS = {
-    "input_dim": 31,
-    "output_dim": 100,
-    "hidden_dim": 1024,
-    "num_blocks": 8,
-}
-
-TASKS = {
-    "broadband": {
-        "target_thickness_mm": 120,
-        "optimization_goal": "maximize_avg",
-        "init_strategy": "default",
-        "target_spec": {
-            "min_avg_absorption": 0.70,
-            "min_peak_absorption": 0.90,
-            "min_band_absorption": 0.60,
-            "min_bandwidth_0.8": 400,
-        },
-    },
-    "low_frequency": {
-        "target_thickness_mm": 150,
-        "optimization_goal": "maximize_peak",
-        "init_strategy": "theory_guided",
-        "target_spec": {
-            "min_avg_absorption": 0.50,
-            "min_peak_absorption": 0.85,
-            "min_band_absorption": 0.40,
-            "min_bandwidth_0.8": 200,
-        },
-    },
-    "multi_band": {
-        "target_thickness_mm": 120,
-        "optimization_goal": "maximize_avg",
-        "init_strategy": "theory_guided",
-        "target_spec": {
-            "min_avg_absorption": 0.60,
-            "min_peak_absorption": 0.85,
-            "min_band_absorption": 0.50,
-            "min_bandwidth_0.8": 300,
-        },
-    },
-    "ultra_thin": {
-        "target_thickness_mm": 50,
-        "optimization_goal": "maximize_avg",
-        "init_strategy": "random",
-        "target_spec": {
-            "min_avg_absorption": 0.40,
-            "min_peak_absorption": 0.75,
-            "min_band_absorption": 0.30,
-            "min_bandwidth_0.8": 150,
-        },
-    },
-}
 
 
-# ─── Model Loading ───────────────────────────────────────────────────────────
+# ── Model Loading ──
 
-def load_model(device: torch.device | None = None) -> ResNetDNN:
-    """Load the pre-trained ResNetDNN surrogate model."""
+def load_surrogate(domain: DomainSpec, model_dir: str = "saved_models",
+                   device: torch.device | None = None) -> tuple[torch.nn.Module, torch.device]:
+    """Load a pre-trained surrogate model for a domain.
+
+    Tries: saved_models/surrogate_{domain.name}.pth first,
+    then falls back to saved_models_dnn_v2/ResNet_PeakFocus.pth for acoustic.
+    """
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    print(f"Loading surrogate model on {device}...")
-    model = ResNetDNN(**MODEL_ARGS)
+    model = ResNetDNN(
+        input_dim=domain.input_dim,
+        output_dim=domain.output_dim,
+        hidden_dim=domain.hidden_dim,
+        num_blocks=domain.num_blocks,
+    ).to(device)
 
-    if os.path.exists(DEFAULT_MODEL_PATH):
-        state_dict = torch.load(DEFAULT_MODEL_PATH, map_location=device)
+    # Try domain-specific checkpoint first
+    checkpoint_path = os.path.join(model_dir, f"surrogate_{domain.name}.pth")
+
+    # Fallback for acoustic: use legacy checkpoint
+    if not os.path.exists(checkpoint_path) and domain.name == "acoustic_metamaterial":
+        legacy_path = os.path.join("saved_models_dnn_v2", "ResNet_PeakFocus.pth")
+        if os.path.exists(legacy_path):
+            checkpoint_path = legacy_path
+
+    if os.path.exists(checkpoint_path):
+        state_dict = torch.load(checkpoint_path, map_location=device)
         model.load_state_dict(state_dict)
-        print(f"  Model loaded from: {DEFAULT_MODEL_PATH}")
+        print(f"  Model loaded: {checkpoint_path}")
     else:
-        print(f"  [WARN] Model file not found: {DEFAULT_MODEL_PATH}")
-        print("  Using RANDOM weights (demonstration mode)")
+        print(f"  [WARN] No checkpoint found at {checkpoint_path}")
+        print(f"  Using RANDOM weights — results will not be physically meaningful.")
 
-    model.to(device)
     model.eval()
-
-    for param in model.parameters():
-        param.requires_grad = False
+    for p in model.parameters():
+        p.requires_grad = False
 
     return model, device
 
 
-# ─── Multi-Agent Design ──────────────────────────────────────────────────────
+# ── Critic Factory ──
 
-def run_multi_agent(task_id: str = "broadband", verbose: bool = True) -> dict:
-    """Run the multi-agent design loop for a given task."""
-    task = TASKS.get(task_id, TASKS["broadband"])
+def create_critic(domain: DomainSpec, critic_type: str = "llm",
+                  model_name: str = "qwen2.5:14b",
+                  backend: str = "ollama"):
+    """Create a critic (LLM or Heuristic) for a domain."""
+    if critic_type == "llm":
+        from agent4science.agents.llm_critic import LLMCritic
+        return LLMCritic(domain, model_name=model_name, backend=backend)
+    elif critic_type == "heuristic":
+        from agent4science.baselines.heuristic_critic import HeuristicCritic
+        return HeuristicCritic(domain)
+    else:
+        raise ValueError(f"Unknown critic type: {critic_type}")
 
-    model, device = load_model()
 
-    designer = DesignerAgent(
-        model=model,
-        device=device,
-        n_restarts=5,
-        steps_per_restart=100,
+# ── Single Run ──
+
+def run_design(domain_name: str, critic_type: str = "llm",
+               constraint_value: float | None = None,
+               n_restarts: int = 5, steps: int = 100,
+               llm_model: str = "qwen2.5:14b",
+               verbose: bool = True) -> dict:
+    """Run a single multi-agent design optimization.
+
+    Args:
+        domain_name: 'acoustic', 'airfoil', or 'concrete'.
+        critic_type: 'llm' or 'heuristic'.
+        constraint_value: Value for constrained parameters.
+        n_restarts, steps: Designer optimization settings.
+        llm_model: LLM model identifier.
+        verbose: Print progress.
+
+    Returns:
+        Result dict with final_design, summary, round_log.
+    """
+    domain = load_domain(domain_name)
+    model, device = load_surrogate(domain)
+
+    # Auto-detect constraint value for acoustic domain
+    if constraint_value is None and domain.constrained_indices:
+        # Use default from target_metrics
+        constraint_value = 120.0  # Default for acoustic
+
+    designer = Designer(
+        model, domain, device=device,
+        n_restarts=n_restarts, steps_per_restart=steps,
     )
 
-    critic = CriticAgent()
+    critic = create_critic(domain, critic_type, model_name=llm_model)
 
-    config = OrchestratorConfig(
-        max_rounds=5,
-        convergence_threshold=0.005,
-        verbose=verbose,
-        **{k: task[k] for k in ("target_thickness_mm", "optimization_goal",
-                                  "init_strategy", "target_spec")},
-    )
+    config = OrchestratorConfig(max_rounds=5, convergence_threshold=0.005, verbose=verbose)
+    orch = Orchestrator(designer, critic, domain, config)
 
-    orchestrator = Orchestrator(designer, critic, config)
-    result = orchestrator.run(user_task=task)
+    result = orch.run(constraint_value=constraint_value)
 
-    # Save results
+    # Save
     os.makedirs("results", exist_ok=True)
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    result_path = f"results/{task_id}_{timestamp}.json"
-
-    # Convert numpy arrays for JSON serialization
-    serializable = _make_serializable(result)
-    with open(result_path, "w") as f:
-        json.dump(serializable, f, indent=2)
-    print(f"  Results saved: {result_path}")
-
-    # Plot
-    spectrum = np.array(result["final_design"].get("spectrum", []))
-    if len(spectrum) > 0:
-        plot_path = f"results/{task_id}_{timestamp}_spectrum.png"
-        plot_spectrum(spectrum, title=f"Multi-Agent Design: {task_id}",
-                       save_path=plot_path, show=False)
-
-    if result["round_log"]:
-        progress_path = f"results/{task_id}_{timestamp}_progress.png"
-        plot_multi_agent_progress(result["round_log"],
-                                   save_path=progress_path, show=False)
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    path = f"results/{domain_name}_{critic_type}_{ts}.json"
+    with open(path, "w") as f:
+        json.dump(_serialize(result), f, indent=2)
+    print(f"  Saved: {path}")
 
     return result
 
 
-# ─── Baselines ───────────────────────────────────────────────────────────────
+# ── Baseline Runner ──
 
-def run_baseline(task_id: str, method: str = "random_search") -> dict:
-    """Run a baseline method on a given task."""
-    from agent4science.experiments.baselines.random_search import random_search
-    from agent4science.experiments.baselines.genetic import genetic_algorithm
+def run_baseline(domain_name: str, method: str = "random_search",
+                 constraint_value: float | None = None,
+                 n_trials: int = 5000,
+                 pop_size: int = 100, generations: int = 50,
+                 bo_iters: int = 100) -> dict:
+    """Run a baseline method on a domain."""
+    domain = load_domain(domain_name)
+    model, device = load_surrogate(domain)
 
-    task = TASKS.get(task_id, TASKS["broadband"])
-    model, device = load_model()
+    print(f"\n{'='*60}")
+    print(f"  Baseline: {method} | Domain: {domain_name}")
+    print(f"{'='*60}")
 
-    print(f"\nRunning {method} baseline for task: {task_id}")
+    t0 = time.time()
 
     if method == "random_search":
-        result = random_search(
-            model, task["target_thickness_mm"],
-            n_trials=5000, goal=task["optimization_goal"],
-            device=device,
-        )
+        from agent4science.experiments.baselines.random_search import random_search
+        result = random_search(model, domain=domain, n_trials=n_trials, device=device)
     elif method == "genetic_algorithm":
-        result = genetic_algorithm(
-            model, task["target_thickness_mm"],
-            population_size=100, generations=50,
-            goal=task["optimization_goal"],
-            device=device,
+        from agent4science.experiments.baselines.genetic import genetic_algorithm as ga_func
+        result = ga_func(model, domain=domain, population_size=pop_size,
+                         generations=generations, device=device)
+    elif method == "bayesian_optimization":
+        from agent4science.baselines.bayesian_opt import bayesian_optimization
+        result = bayesian_optimization(
+            model, domain, n_iterations=bo_iters, device=device,
         )
     else:
-        raise ValueError(f"Unknown baseline method: {method}")
+        raise ValueError(f"Unknown baseline: {method}")
 
+    elapsed = time.time() - t0
+
+    metrics = result.get("metrics", {})
+    print(f"  Avg Output: {metrics.get('avg_output', 0):.4f}")
+    print(f"  Peak Output: {metrics.get('peak_output', 0):.4f}")
+    print(f"  Time: {elapsed:.1f}s")
+
+    # Save
     os.makedirs("results", exist_ok=True)
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    result_path = f"results/{task_id}_{method}_{timestamp}.json"
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    path = f"results/{domain_name}_{method}_{ts}.json"
+    with open(path, "w") as f:
+        json.dump(_serialize(result), f, indent=2)
 
-    serializable = _make_serializable(result)
-    with open(result_path, "w") as f:
-        json.dump(serializable, f, indent=2)
-    print(f"  Results saved: {result_path}")
-
+    result["elapsed_s"] = elapsed
     return result
 
 
-# ─── Full Benchmark ──────────────────────────────────────────────────────────
+# ── Full Benchmark ──
 
-def run_benchmark():
-    """Run full benchmark: multi-agent + baselines on all tasks."""
+def run_benchmark(domains: list[str] | None = None,
+                  methods: list[str] | None = None,
+                  seeds: int = 3):
+    """Run full benchmark across domains and methods."""
+    if domains is None:
+        domains = ["acoustic", "airfoil", "concrete"]
+    if methods is None:
+        methods = ["llm", "heuristic", "designer_only",
+                    "random_search", "genetic_algorithm",
+                    "bayesian_optimization"]
+
     import csv
 
     os.makedirs("results", exist_ok=True)
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    csv_path = f"results/benchmark_{timestamp}.csv"
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    csv_path = f"results/benchmark_{ts}.csv"
 
-    results = []
-    methods = ["multi_agent", "random_search", "genetic_algorithm"]
+    rows = []
 
-    for task_id in TASKS:
+    for domain_name in domains:
         for method in methods:
-            print(f"\n{'='*60}")
-            print(f"  Benchmark: {task_id} | {method}")
-            print(f"{'='*60}")
+            print(f"\n{'#'*60}")
+            print(f"#  Domain: {domain_name} | Method: {method}")
+            print(f"{'#'*60}")
 
-            try:
-                if method == "multi_agent":
-                    result = run_multi_agent(task_id, verbose=True)
-                    metrics = result["summary"]
-                elif method == "random_search":
-                    result = run_baseline(task_id, method)
-                    metrics = result["metrics"]
-                elif method == "genetic_algorithm":
-                    result = run_baseline(task_id, method)
-                    metrics = result["metrics"]
+            for seed in range(seeds):
+                np.random.seed(seed)
+                torch.manual_seed(seed)
 
-                results.append({
-                    "task": task_id,
-                    "method": method,
-                    "avg_absorption": metrics.get("avg_absorption", 0),
-                    "peak_absorption": metrics.get("peak_absorption", 0),
-                    "bandwidth_0.8_hz": metrics.get("bandwidth_0.8_hz", 0),
-                    "worst_band_absorption": metrics.get("worst_band_absorption", 0),
-                })
-            except Exception as e:
-                print(f"  [ERROR] {e}")
-                results.append({
-                    "task": task_id,
-                    "method": method,
-                    "error": str(e),
-                })
+                try:
+                    if method in ("llm", "heuristic"):
+                        result = run_design(
+                            domain_name, critic_type=method,
+                            n_restarts=3, steps=100, verbose=(seed == 0),
+                        )
+                        row = {
+                            "domain": domain_name, "method": method,
+                            "seed": seed,
+                            "avg_output": result["summary"].get("avg_output", 0),
+                            "peak_output": result["summary"].get("peak_output", 0),
+                            "rounds": result["total_rounds"],
+                            "time_s": result["total_time_s"],
+                            "verdict": result["verdict"],
+                        }
+                    elif method == "designer_only":
+                        domain = load_domain(domain_name)
+                        model, device = load_surrogate(domain)
+                        designer = Designer(
+                            model, domain, device=device,
+                            n_restarts=3, steps_per_restart=100,
+                        )
+                        t0 = time.time()
+                        design = designer.optimize(feedback=None)
+                        elapsed = time.time() - t0
+                        row = {
+                            "domain": domain_name, "method": method,
+                            "seed": seed,
+                            "avg_output": design["metrics"].get("avg_output", 0),
+                            "peak_output": design["metrics"].get("peak_output", 0),
+                            "rounds": 1, "time_s": elapsed, "verdict": "n/a",
+                        }
+                    else:
+                        result = run_baseline(domain_name, method)
+                        row = {
+                            "domain": domain_name, "method": method,
+                            "seed": seed,
+                            "avg_output": result["metrics"].get("avg_output", 0),
+                            "peak_output": result["metrics"].get("peak_output", 0),
+                            "rounds": 1,
+                            "time_s": result.get("elapsed_s", 0),
+                            "verdict": "n/a",
+                        }
+
+                    rows.append(row)
+
+                    if seed == 0:
+                        print(f"  avg_output={row['avg_output']:.4f} | "
+                              f"time={row['time_s']:.1f}s")
+
+                except Exception as e:
+                    print(f"  [ERROR] {e}")
+                    import traceback
+                    traceback.print_exc()
+                    rows.append({
+                        "domain": domain_name, "method": method,
+                        "seed": seed, "error": str(e),
+                    })
 
     # Write CSV
-    if results:
-        fieldnames = ["task", "method", "avg_absorption", "peak_absorption",
-                       "bandwidth_0.8_hz", "worst_band_absorption"]
+    if rows:
+        fieldnames = ["domain", "method", "seed", "avg_output",
+                       "peak_output", "rounds", "time_s", "verdict"]
         with open(csv_path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
             writer.writeheader()
-            writer.writerows(results)
-        print(f"\n[SAVED] Benchmark results: {csv_path}")
+            writer.writerows(rows)
+        print(f"\n[SAVED] {csv_path}")
 
-        # Print summary table
-        print(f"\n{'Task':<16} {'Method':<22} {'Avg Abs':>8} {'Peak Abs':>8} {'BW 0.8':>8} {'Worst Band':>10}")
-        print("-" * 80)
-        for r in results:
-            if "error" not in r:
-                print(f"{r['task']:<16} {r['method']:<22} "
-                      f"{r['avg_absorption']:>8.4f} {r['peak_absorption']:>8.4f} "
-                      f"{r['bandwidth_0.8_hz']:>8.0f} {r['worst_band_absorption']:>10.4f}")
+        # Summary table
+        print(f"\n{'Domain':<16} {'Method':<24} {'Avg':>8} {'Time':>8}")
+        print("-" * 60)
+        from collections import defaultdict
+        agg = defaultdict(dict)
+        for r in rows:
+            if "error" in r:
+                continue
+            key = (r["domain"], r["method"])
+            if key not in agg:
+                agg[key] = {"avgs": [], "times": []}
+            agg[key]["avgs"].append(r.get("avg_output", 0))
+            agg[key]["times"].append(r.get("time_s", 0))
 
-
-# ─── Utilities ────────────────────────────────────────────────────────────────
-
-def _make_serializable(obj):
-    """Convert numpy arrays and other non-serializable types for JSON export."""
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    elif isinstance(obj, np.floating):
-        return float(obj)
-    elif isinstance(obj, np.integer):
-        return int(obj)
-    elif isinstance(obj, dict):
-        return {k: _make_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [_make_serializable(v) for v in obj]
-    return obj
+        for (dom, meth), vals in sorted(agg.items()):
+            avg = np.mean(vals["avgs"])
+            t = np.mean(vals["times"])
+            print(f"{dom:<16} {meth:<24} {avg:>8.4f} {t:>7.1f}s")
 
 
-# ─── CLI ─────────────────────────────────────────────────────────────────────
+# ── CLI ──
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Multi-Agent Scientific Inverse Design for Acoustic Metamaterials"
+        description="LLM-Guided Inverse Design — Domain-Agnostic Framework"
     )
-    parser.add_argument("--task", type=str, default="broadband",
-                        choices=list(TASKS.keys()),
-                        help="Design task to run (default: broadband)")
+    parser.add_argument("--domain", type=str, default="acoustic",
+                        choices=["acoustic", "airfoil", "concrete"],
+                        help="Design domain")
+    parser.add_argument("--critic", type=str, default="llm",
+                        choices=["llm", "heuristic"],
+                        help="Critic type: llm (proposed) or heuristic (ablation)")
+    parser.add_argument("--baseline", type=str, default=None,
+                        choices=["random_search", "genetic_algorithm",
+                                  "bayesian_optimization"],
+                        help="Run a specific baseline")
     parser.add_argument("--benchmark", action="store_true",
                         help="Run full benchmark suite")
-    parser.add_argument("--baseline", type=str, default=None,
-                        choices=["random_search", "genetic_algorithm"],
-                        help="Run a specific baseline method")
-    parser.add_argument("--output-dir", type=str, default="results",
-                        help="Output directory for results")
+    parser.add_argument("--llm-model", type=str, default="qwen2.5:14b",
+                        help="LLM model name")
+    parser.add_argument("--constraint", type=float, default=None,
+                        help="Constraint value for locked parameters")
+    parser.add_argument("--restarts", type=int, default=5)
+    parser.add_argument("--steps", type=int, default=100)
+    parser.add_argument("--seeds", type=int, default=3)
 
     args = parser.parse_args()
 
-    print("\n╔══════════════════════════════════════════════════════╗")
-    print("║   Multi-Agent Inverse Design for Acoustic Metamaterials  ║")
-    print("╚══════════════════════════════════════════════════════╝\n")
+    print("\n" + "=" * 60)
+    print("  LLM-Guided Inverse Design Framework")
+    print("  Domain-Agnostic | Cross-Physics Validation")
+    print("=" * 60 + "\n")
 
     if args.benchmark:
-        run_benchmark()
+        run_benchmark(seeds=args.seeds)
     elif args.baseline:
-        run_baseline(args.task, args.baseline)
+        run_baseline(args.domain, args.baseline, constraint_value=args.constraint)
     else:
-        run_multi_agent(args.task)
+        run_design(
+            args.domain,
+            critic_type=args.critic,
+            constraint_value=args.constraint,
+            n_restarts=args.restarts,
+            steps=args.steps,
+            llm_model=args.llm_model,
+        )
+
+
+def _serialize(obj):
+    """Convert numpy types for JSON serialization."""
+    if isinstance(obj, (np.ndarray,)):
+        return obj.tolist()
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, dict):
+        return {k: _serialize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_serialize(v) for v in obj]
+    return obj
 
 
 if __name__ == "__main__":

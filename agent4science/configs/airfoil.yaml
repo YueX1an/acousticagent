@@ -1,0 +1,76 @@
+name: airfoil_cst
+description: >
+  CST-parameterized airfoil shape optimization at Reynolds number 100,000.
+  The Class-Shape Transformation (CST) method parameterizes the airfoil
+  surface using 8 upper-surface + 8 lower-surface Bernstein polynomial
+  coefficients. The output is lift coefficient (Cl) and drag coefficient (Cd).
+  The design goal is to maximize the lift-to-drag ratio (Cl/Cd).
+
+input_dim: 16
+output_dim: 2
+
+param_names:
+  - CST_Upper_0
+  - CST_Upper_1
+  - CST_Upper_2
+  - CST_Upper_3
+  - CST_Upper_4
+  - CST_Upper_5
+  - CST_Upper_6
+  - CST_Upper_7
+  - CST_Lower_0
+  - CST_Lower_1
+  - CST_Lower_2
+  - CST_Lower_3
+  - CST_Lower_4
+  - CST_Lower_5
+  - CST_Lower_6
+  - CST_Lower_7
+
+param_bounds:
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+  - [-0.3, 0.3]
+
+constrained_indices: []
+
+output_type: vector
+output_labels:
+  - Cl
+  - Cd
+
+physical_constraints:
+  - Cl_greater_than_zero
+  - Cd_greater_than_zero
+  - Cl_over_Cd_physically_reasonable
+
+optimization_goal: maximize_ratio
+
+critic_n_bands: 2
+critic_band_labels:
+  - Cl
+  - Cd
+
+target_metrics:
+  min_Cl: 0.8
+  max_Cd: 0.05
+
+init_strategies:
+  - default
+  - random
+
+hidden_dim: 512
+num_blocks: 4

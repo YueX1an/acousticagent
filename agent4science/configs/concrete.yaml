@@ -1,0 +1,57 @@
+name: concrete_strength
+description: >
+  Concrete mix design optimization. Parameters control the mixture composition:
+  cement, blast furnace slag, fly ash, water, superplasticizer, coarse aggregate,
+  fine aggregate content (all in kg/m³), and curing age (days). The output is
+  the compressive strength in MPa. The design goal is to maximize strength
+  while maintaining a reasonable water/cement ratio.
+
+input_dim: 8
+output_dim: 1
+
+param_names:
+  - Cement
+  - Blast_Furnace_Slag
+  - Fly_Ash
+  - Water
+  - Superplasticizer
+  - Coarse_Aggregate
+  - Fine_Aggregate
+  - Age
+
+param_bounds:
+  - [100.0, 900.0]
+  - [0.0, 400.0]
+  - [0.0, 300.0]
+  - [100.0, 250.0]
+  - [0.0, 40.0]
+  - [600.0, 1200.0]
+  - [500.0, 1100.0]
+  - [1.0, 365.0]
+
+constrained_indices: []
+
+output_type: scalar
+output_labels:
+  - Compressive_Strength_MPa
+
+physical_constraints:
+  - water_cement_ratio_below_0.6
+  - total_mass_approximately_2400
+  - strength_positive
+
+optimization_goal: maximize_output
+
+critic_n_bands: 1
+critic_band_labels:
+  - Strength
+
+target_metrics:
+  min_strength_MPa: 50.0
+
+init_strategies:
+  - default
+  - random
+
+hidden_dim: 256
+num_blocks: 4
