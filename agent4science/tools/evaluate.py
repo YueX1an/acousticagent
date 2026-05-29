@@ -13,13 +13,15 @@ def evaluate_design(
     model: ResNetDNN,
     params: np.ndarray,
     device: torch.device | None = None,
+    output_type: str = "generic",
 ) -> dict:
-    """Evaluate absorption spectrum for a given design.
+    """Evaluate surrogate model prediction for a given design.
 
     Args:
         model: Pre-trained ResNetDNN surrogate model.
-        params: 31-dim numpy array of design parameters.
+        params: Design parameters (input_dim,) numpy array.
         device: Torch device. Auto-detected if None.
+        output_type: 'spectrum' (clip to [0,1]), 'vector', 'scalar', or 'generic'.
 
     Returns:
         dict with keys: spectrum, metrics.
@@ -32,7 +34,8 @@ def evaluate_design(
     with torch.no_grad():
         spectrum = model(tensor).flatten().cpu().numpy()
 
-    spectrum = np.clip(spectrum, 0.0, 1.0)
+    if output_type == "spectrum":
+        spectrum = np.clip(spectrum, 0.0, 1.0)
     metrics = compute_all_metrics(spectrum)
 
     return {

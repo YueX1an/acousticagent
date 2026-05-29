@@ -121,15 +121,28 @@ def build_loss(
     n_weak = 0
     for region in feedback.weak_regions:
         indices = region.get("indices", [0, output.shape[0]])
-        start, end = int(indices[0]), min(int(indices[1]), output.shape[0])
-        if start >= end:
+        # Handle malformed indices from LLM
+        if not indices or len(indices) < 1:
+            continue
+        if len(indices) == 1:
+            # Single index — treat as dimension index: [i, i+1]
+            start = int(indices[0])
+            end = min(start + 1, output.shape[0])
+        else:
+            start = int(indices[0])
+            end = min(int(indices[1]), output.shape[0])
+        if start >= end or start < 0:
             continue
 
         region_output = output[start:end]
         current_mean = float(torch.mean(region_output).detach().cpu().item())
 
         # Dynamic τ scaling (Section 3.6.1)
-        target_llm = float(region.get("target", 0.8))
+        target_raw = region.get("target", 0.8)
+        if target_raw is None:
+            target_llm = 0.8  # Fallback default
+        else:
+            target_llm = float(target_raw)
         tau = min(1.0, current_mean + trust_factor * (target_llm - current_mean))
 
         # Softplus penalty (Section 3.6)
@@ -219,14 +232,18 @@ class FeedbackSmoother:
         # Retain previous regions that still don't meet their targets
         smoothed_regions = list(feedback.weak_regions)  # Current regions at full weight
 
-        current_region_indices = {
-            (r.get("indices", [0, 0])[0], r.get("indices", [0, 0])[1])
-            for r in feedback.weak_regions
-        }
+        current_region_indices = set()
+        for r in feedback.weak_regions:
+            idx = r.get("indices", [0, 0])
+            if idx and len(idx) >= 2:
+                current_region_indices.add((int(idx[0]), int(idx[1])))
 
         for prev_region in self._prev_weak_regions:
-            prev_start = prev_region.get("indices", [0, 0])[0]
-            prev_end = prev_region.get("indices", [0, 0])[1]
+            prev_idx = prev_region.get("indices", [0, 0])
+            if not prev_idx or len(prev_idx) < 2:
+                continue
+            prev_start = int(prev_idx[0])
+            prev_end = int(prev_idx[1])
             prev_key = (prev_start, prev_end)
 
             if prev_key in current_region_indices:

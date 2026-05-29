@@ -77,7 +77,7 @@ def _genetic_algorithm_domain(
     for gen in range(gens):
         fitness = np.zeros(pop_size)
         for i in range(pop_size):
-            result = evaluate_design(model, population[i], device)
+            result = evaluate_design(model, population[i], device, output_type=domain.output_type)
             output = np.array(result["spectrum"])
             if domain.optimization_goal in ("maximize_avg", "maximize_output"):
                 fitness[i] = float(np.mean(output))
@@ -156,7 +156,7 @@ def _genetic_algorithm_legacy(
         # Evaluate fitness
         fitness = np.zeros(population_size)
         for i in range(population_size):
-            result = evaluate_design(model, population[i], device)
+            result = evaluate_design(model, population[i], device, output_type='spectrum')
             spectrum = np.array(result["spectrum"])
             if goal == "maximize_avg":
                 fitness[i] = float(np.mean(spectrum))

@@ -45,9 +45,13 @@ def spectral_smoothness(spectrum: np.ndarray) -> float:
 
 def compute_all_metrics(spectrum: np.ndarray, freq_step: float = 20.0) -> dict:
     """Compute all evaluation metrics for a spectrum."""
+    avg = avg_absorption(spectrum)
+    peak = peak_absorption(spectrum)
     return {
-        "avg_absorption": avg_absorption(spectrum),
-        "peak_absorption": peak_absorption(spectrum),
+        "avg_absorption": avg,
+        "avg_output": avg,      # Alias for cross-domain compatibility
+        "peak_absorption": peak,
+        "peak_output": peak,    # Alias for cross-domain compatibility
         "peak_frequency_hz": peak_frequency(spectrum, freq_step),
         "bandwidth_0.8_hz": bandwidth_above(spectrum, 0.8, freq_step),
         "bandwidth_0.9_hz": bandwidth_above(spectrum, 0.9, freq_step),

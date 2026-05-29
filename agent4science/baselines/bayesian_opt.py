@@ -65,7 +65,7 @@ def bayesian_optimization(
     # Evaluate initial samples
     y = np.zeros(n_initial)
     for i in range(n_initial):
-        result = evaluate_design(model, X[i], device)
+        result = evaluate_design(model, X[i], device, output_type=domain.output_type)
         y[i] = _compute_objective(result["spectrum"], domain)
 
     # Best so far
@@ -91,7 +91,7 @@ def bayesian_optimization(
             x_next = np.clip(x_next, lo, hi)
 
             # Evaluate
-            result = evaluate_design(model, x_next, device)
+            result = evaluate_design(model, x_next, device, output_type=domain.output_type)
             y_next = _compute_objective(result["spectrum"], domain)
 
             # Update
@@ -112,13 +112,13 @@ def bayesian_optimization(
                 for idx in domain.constrained_indices:
                     x_next[idx] = constraint_value
             x_next = np.clip(x_next, lo, hi)
-            result = evaluate_design(model, x_next, device)
+            result = evaluate_design(model, x_next, device, output_type=domain.output_type)
             y_next = _compute_objective(result["spectrum"], domain)
             X_norm = np.vstack([X_norm, normalize(x_next)])
             y = np.append(y, y_next)
 
     # Final evaluation
-    final_result = evaluate_design(model, best_x, device)
+    final_result = evaluate_design(model, best_x, device, output_type=domain.output_type)
 
     return {
         "best_params": best_x.tolist(),

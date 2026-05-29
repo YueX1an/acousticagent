@@ -63,7 +63,7 @@ def _random_search_domain(
         for idx in domain.constrained_indices:
             params[idx] = lo[idx]  # Default to lower bound
 
-        result = evaluate_design(model, params, device)
+        result = evaluate_design(model, params, device, output_type=domain.output_type)
         output = np.array(result["spectrum"])
 
         if domain.optimization_goal in ("maximize_avg", "maximize_output"):
@@ -82,7 +82,7 @@ def _random_search_domain(
             best_params = params.copy()
             best_output = output.copy()
 
-    best_result = evaluate_design(model, best_params, device)
+    best_result = evaluate_design(model, best_params, device, output_type=domain.output_type)
 
     return {
         "best_params": best_params.tolist(),
