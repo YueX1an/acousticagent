@@ -48,3 +48,4 @@ saved_models_dnn_v2/
 .mypy_cache/
 results/
 .claude/
+data/

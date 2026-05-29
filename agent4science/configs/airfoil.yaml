@@ -2,50 +2,38 @@ name: airfoil_cst
 description: >
   CST-parameterized airfoil shape optimization at Reynolds number 100,000.
   The Class-Shape Transformation (CST) method parameterizes the airfoil
-  surface using 8 upper-surface + 8 lower-surface Bernstein polynomial
-  coefficients. The output is lift coefficient (Cl) and drag coefficient (Cd).
+  surface using 8 Bernstein polynomial coefficients, plus Angle of Attack (AoA).
+  The output is lift coefficient (Cl) and drag coefficient (Cd).
   The design goal is to maximize the lift-to-drag ratio (Cl/Cd).
+  Dataset: 2,900 airfoils × 13 AoA angles = 28,832 valid samples
+  after filtering (Cl>0, Cd>0.0001).
 
-input_dim: 16
+input_dim: 9
 output_dim: 2
 
 param_names:
-  - CST_Upper_0
-  - CST_Upper_1
-  - CST_Upper_2
-  - CST_Upper_3
-  - CST_Upper_4
-  - CST_Upper_5
-  - CST_Upper_6
-  - CST_Upper_7
-  - CST_Lower_0
-  - CST_Lower_1
-  - CST_Lower_2
-  - CST_Lower_3
-  - CST_Lower_4
-  - CST_Lower_5
-  - CST_Lower_6
-  - CST_Lower_7
+  - CST_1
+  - CST_2
+  - CST_3
+  - CST_4
+  - CST_5
+  - CST_6
+  - CST_7
+  - CST_8
+  - AoA
 
 param_bounds:
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
-  - [-0.3, 0.3]
+  - [-0.5, 0.5]
+  - [-0.5, 0.5]
+  - [-0.5, 0.5]
+  - [-0.5, 0.5]
+  - [-0.5, 0.5]
+  - [-0.5, 0.5]
+  - [-0.5, 0.5]
+  - [-0.5, 0.5]
+  - [-4.0, 8.0]
 
-constrained_indices: []
+constrained_indices: [8]
 
 output_type: vector
 output_labels:
