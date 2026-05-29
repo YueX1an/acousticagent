@@ -49,6 +49,9 @@ class DomainSpec:
     # ── Optimization goal ──
     optimization_goal: str = "maximize_avg"  # maximize_avg | maximize_peak | maximize_output
 
+    # ── Default initialization ──
+    default_init_values: list[float] = field(default_factory=list)  # Per-param default
+
     # ── Critic configuration ──
     critic_n_bands: int = 5                # Number of output regions for spectrum
     critic_band_labels: list[str] = field(default_factory=list)

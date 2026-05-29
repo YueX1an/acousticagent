@@ -56,6 +56,17 @@ target_metrics:
   min_Cl: 0.8
   max_Cd: 0.05
 
+default_init_values:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 2.0
+
 init_strategies:
   - default
   - random

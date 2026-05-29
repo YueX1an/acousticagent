@@ -49,6 +49,16 @@ critic_band_labels:
 target_metrics:
   min_strength_MPa: 50.0
 
+default_init_values:
+  - 281.0
+  - 73.0
+  - 54.0
+  - 181.0
+  - 6.0
+  - 972.0
+  - 773.0
+  - 28.0
+
 init_strategies:
   - default
   - random

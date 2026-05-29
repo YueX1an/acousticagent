@@ -246,13 +246,21 @@ class Designer:
         if strategy == "random":
             params = np.random.uniform(lo, hi)
         elif strategy == "theory_guided":
-            # Mid-range with domain-appropriate perturbation
-            mid = (lo + hi) / 2.0
-            params = mid + np.random.uniform(-0.2, 0.2, input_dim) * (hi - lo)
+            # Use default init values if available, otherwise mid-range
+            if self.domain.default_init_values:
+                base = np.array(self.domain.default_init_values)
+            else:
+                base = (lo + hi) / 2.0
+            params = base + np.random.uniform(-0.1, 0.1, input_dim) * (hi - lo)
         else:  # default
-            params = (lo + hi) / 2.0
+            if self.domain.default_init_values:
+                base = np.array(self.domain.default_init_values)
+            else:
+                base = (lo + hi) / 2.0
             if restart_idx > 0:
-                params += np.random.uniform(-0.1, 0.1, input_dim) * (hi - lo)
+                params = base + np.random.uniform(-0.05, 0.05, input_dim) * (hi - lo)
+            else:
+                params = base.copy()
 
         # Apply constraint
         if constraint_value is not None:
