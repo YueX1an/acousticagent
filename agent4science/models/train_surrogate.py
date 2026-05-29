@@ -77,7 +77,7 @@ def train_surrogate(
         y_train = y_train[train_indices]
 
     if verbose:
-        print(f"Training {domain.name} surrogate: {input_dim}→{output_dim}")
+        print(f"Training {domain.name} surrogate: {input_dim}->{output_dim}")
         print(f"  Train: {len(X_train)}, Val: {len(X_val)}")
         print(f"  Hidden: {hidden_dim}, Blocks: {num_blocks}, Device: {device}")
 
@@ -159,7 +159,7 @@ def train_surrogate(
 
         if verbose and epoch % 50 == 0:
             print(f"  Epoch {epoch:4d} | Train Loss: {train_loss:.6f} | "
-                  f"Val Loss: {val_loss:.6f} | Val R²: {val_r2:.4f}")
+                  f"Val Loss: {val_loss:.6f} | Val R2: {val_r2:.4f}")
 
         if patience_counter >= patience:
             if verbose:
@@ -169,7 +169,7 @@ def train_surrogate(
     t_end = time.time()
     if verbose:
         print(f"  Done in {t_end - t_start:.1f}s")
-        print(f"  Best epoch: {best_epoch}, Val R²: {history[best_epoch - 1]['val_r2']:.4f}")
+        print(f"  Best epoch: {best_epoch}, Val R2: {history[best_epoch - 1]['val_r2']:.4f}")
 
     # Load best model
     checkpoint_path = os.path.join(save_dir, f"surrogate_{domain.name}.pth")
@@ -223,5 +223,5 @@ if __name__ == "__main__":
         save_dir=args.save_dir,
     )
 
-    print(f"\nFinal Val R²: {stats['best_val_r2']:.4f}")
+    print(f"\nFinal Val R2: {stats['best_val_r2']:.4f}")
     print(f"Model saved: {stats['checkpoint_path']}")
