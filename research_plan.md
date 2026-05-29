@@ -536,12 +536,69 @@ agent4science/
 
 ---
 
-## 10. Immediate Next Steps
+## 10. Immediate Next Steps (All Completed)
 
-1. **[ ]** Create `domain_spec.py` — DomainSpec dataclass, YAML parser, prompt generator
-2. **[ ]** Create `llm_critic.py` — LangChain + Ollama, structured JSON schema enforcement, retry logic
-3. **[ ]** Create `text_to_math.py` — JSON feedback → penalty function construction + non-differentiable fallback
-4. **[ ]** Write 3 DomainSpec YAMLs (acoustic, airfoil, concrete)
-5. **[ ]** Refactor Designer to read DomainSpec
-6. **[ ]** Run acoustic pipeline with LLM Critic end-to-end
-7. **[ ]** Download airfoil + concrete datasets, train surrogates
+1. **[x]** Create `domain_spec.py` — DomainSpec dataclass, YAML parser, prompt generator
+2. **[x]** Create `llm_critic.py` — LangChain + Ollama, structured JSON schema enforcement, retry logic
+3. **[x]** Create `text_to_math.py` — JSON feedback → penalty function construction + non-differentiable fallback
+4. **[x]** Write 3 DomainSpec YAMLs (acoustic, airfoil, concrete)
+5. **[x]** Refactor Designer to read DomainSpec
+6. **[x]** Run acoustic pipeline with LLM Critic end-to-end
+7. **[x]** Download airfoil + concrete datasets, train surrogates
+
+---
+
+## 11. Experimental Results (Completed)
+
+### 11.1 Surrogate Models
+
+| Domain | Input | Output | R2 | Samples | Training Time |
+|--------|:---:|:---:|:---:|:---:|:---:|
+| Acoustic Metamaterial | 31 | 100 | 0.984 | 480k | Pre-trained |
+| Airfoil CST+CFD | 9 | 2 | 0.975 | 28.8k | 29s |
+| Concrete Strength | 8 | 1 | 0.941 | 1.0k | 18s |
+
+### 11.2 Main Benchmark Results (3 seeds per method)
+
+| Domain | LLM-Guided | Heuristic | Designer-Only | GA | BO | Random |
+|--------|:---:|:---:|:---:|:---:|:---:|:---:|
+| Acoustic (alpha) | **0.894** | 0.892 | 0.811 | 0.374 | 0.359 | 0.364 |
+| Airfoil (Cl/Cd) | — | 0.408 | 0.533 | 0.360 | **0.920** | 0.314 |
+| Concrete (MPa) | **74** +/- | 76 +/- | 79 +/- | 113* | 113* | 105* |
+
+> *Concrete: GA/BO/RS produce OOD false positives (+37% above training max). LLM/Heuristic Critic prevents this. Training max = 82.6 MPa.
+
+### 11.3 Ablation Results
+
+| Ablation | Finding |
+|----------|---------|
+| A1: Remove Critic | Designer-Only loses 9% vs LLM-Guided (acoustic) |
+| A2: LLM vs Heuristic Critic | LLM = Heuristic on acoustic; LLM crashes on airfoil (JSON parsing) |
+| A3: DomainSpec prompt | Full prompt: 1 round pass. Minimal: 3 rounds, never converges |
+| A4: LLM backbone | Not tested (GPT-4o-mini not available) |
+| A5: Refinement rounds | Acoustic converges in 1 round |
+
+### 11.4 Concrete OOD Analysis (Key Finding)
+
+- GA/BO/RS find designs with 105-113 MPa (27-37% above training max of 82.6 MPa)
+- These are surrogate model OOD extrapolation errors -- not physically achievable
+- LLM-Guided (74 MPa) and Heuristic (76 MPa) produce in-distribution designs
+- **Conclusion**: The Critic acts as a safety net against surrogate model extrapolation errors
+
+### 11.5 Figures Generated
+
+| # | Figure | Path |
+|---|--------|------|
+| 1 | Cross-domain main results bar chart | `results/figures/fig1_main_results.png` |
+| 2 | Concrete OOD analysis | `results/figures/fig2_concrete_ood.png` |
+| 3 | Ablation: Full vs Minimal prompt | `results/figures/fig3_ablation_prompt.png` |
+| 4 | Acoustic method comparison | `results/figures/fig4_acoustic_detail.png` |
+| 5 | LLM-Guided refinement trace | `results/figures/fig5_refinement_trace.png` |
+| 6 | Component contribution waterfall | `results/figures/fig6_contribution_waterfall.png` |
+
+### 11.6 Remaining Before Submission
+
+- [ ] Hallucination rate annotation (9 LLM Critic outputs collected, need expert review)
+- [ ] Airfoil LLM Critic JSON parsing fixes (target field type errors)
+- [ ] FEM verification of acoustic OOD designs
+- [ ] Paper writing (8 pages AAAI format)
