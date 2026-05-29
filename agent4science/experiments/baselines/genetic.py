@@ -115,13 +115,12 @@ def _genetic_algorithm_domain(
         population = new_pop
 
     best_idx = np.argmax(fitness)
-    best_result = evaluate_design(model, population[best_idx], device)
+    best_result = evaluate_design(model, population[best_idx], device, output_type=domain.output_type)
 
     return {
         "best_params": population[best_idx].tolist(),
         "best_spectrum": np.array(best_result["spectrum"]).tolist(),
-        "metrics": {"avg_output": float(np.mean(best_result["spectrum"])),
-                     "peak_output": float(np.max(best_result["spectrum"]))},
+        "metrics": best_result["metrics"],
         "best_fitness": float(fitness[best_idx]),
         "convergence_history": history,
         "config": {"population_size": pop_size, "generations": gens,

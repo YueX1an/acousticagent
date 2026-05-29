@@ -140,9 +140,12 @@ def build_loss(
         # Dynamic τ scaling (Section 3.6.1)
         target_raw = region.get("target", 0.8)
         if target_raw is None:
-            target_llm = 0.8  # Fallback default
+            target_llm = 0.8
         else:
-            target_llm = float(target_raw)
+            try:
+                target_llm = float(target_raw)
+            except (ValueError, TypeError):
+                target_llm = 0.8  # LLM returned a non-numeric target — ignore
         tau = min(1.0, current_mean + trust_factor * (target_llm - current_mean))
 
         # Softplus penalty (Section 3.6)
