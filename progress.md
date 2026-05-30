@@ -132,21 +132,63 @@ concrete         random_search           104.8     3
 
 ---
 
+## Phase 5: Honest Assessment (May 30)
+
+### Critical Gaps Found
+
+**Gap 1: Missing AI Baselines (MOST URGENT)**
+- All current baselines are traditional optimization methods (GA, BO, Random Search)
+- **Zero AI baselines**: No pure LLM Agent, no LLM-only optimization
+- AAAI reviewers will reject without AI comparison points
+- Required: B1 (Pure LLM ReAct), B2 (No Text-to-Math bridge), B3 (LLM backbone comparison)
+
+**Gap 2: H1 Failed (LLM = Heuristic on Acoustic)**
+- On our best-tested domain, LLM Critic (0.894) = Heuristic Critic (0.892)
+- The hypothesis that "LLM reasoning beats rules" is NOT supported
+- Mitigation: reframe paper around C4 (OOD detection) and C2 (Text-to-Math), not C1
+
+**Gap 3: Figure Quality**
+- 6 bar charts do not make an AAAI paper
+- Need: vector architecture diagram, qualitative LLM reasoning traces, optimization trajectories
+
+**Gap 4: Only 3 Seeds**
+- Statistical significance requires 10 seeds; currently only 3
+
+### Revised Paper Direction
+
+**NEW thesis**: "LLM-Guided optimization prevents surrogate model OOD errors that deceive traditional optimizers."
+
+**Key evidence**:
+1. Concrete: GA/BO chase 113 MPa (+37% OOD). LLM-Guided = 74 MPa (realistic).
+2. Acoustic FEM: Surrogate 0.898, FEM produces NaN — design is physically invalid.
+3. Ablation: Without DomainSpec prompt context, LLM over-refines and never converges.
+
 ## Remaining Work
 
+### Immediate (Next 1-2 Days)
+| # | Task | Status | Est. Time |
+|---|------|:---:|:---:|
+| B1 | Pure LLM ReAct Agent baseline | **Not started** | 2h |
+| B2 | LLM Critic without Text-to-Math bridge | **Not started** | 1h |
+| B3 | LLM backbone comparison (Qwen vs GPT) | **Not started** | 1h |
+| 1 | Hallucination rate annotation | Pending | 2h |
+| 2 | FEM verification of acoustic OOD | Partial | 2h |
+| 3 | Fix airfoil LLM Critic stability | **Not started** | 1h |
+| 4 | Re-run benchmark with 10 seeds | **Not started** | 3h |
+| 5 | Verify concrete 113 MPa is truly OOD | **Not started** | 1h |
+
 ### Before Paper Submission
-| # | Task | Status | Owner | Est. Time |
-|---|------|:---:|------|:---:|
-| 1 | Hallucination rate annotation | Pending | User | 2h |
-| 2 | FEM verification of acoustic OOD designs | Partial (NaN at some freq) | MATLAB | 2h |
-| 3 | Airfoil LLM Critic JSON parsing robustness | Needs fix | Code | 1h |
-| 4 | Statistical tests (Wilcoxon, Cohen's d) | Data ready | Code | 30min |
-| 5 | Write Introduction | Pending | — | 2 days |
-| 6 | Write Related Work | Pending | — | 1 day |
-| 7 | Write Method (Sections 3.1-3.7) | Pending | — | 3 days |
-| 8 | Write Experiments (Sections 4.1-4.6) | Pending | — | 3 days |
-| 9 | Write Discussion + Conclusion | Pending | — | 1 day |
-| 10 | Polish, format for AAAI, proofread | Pending | — | 2 days |
+| # | Task | Est. Time |
+|---|------|:---:|
+| 6 | Architecture diagram (draw.io/TikZ) | 2h |
+| 7 | Qualitative LLM reasoning examples | 1h |
+| 8 | Statistical tests (Wilcoxon, Cohen's d) | 30min |
+| 9 | Write Introduction | 2 days |
+| 10 | Write Related Work | 1 day |
+| 11 | Write Method | 3 days |
+| 12 | Write Experiments | 3 days |
+| 13 | Write Discussion + Conclusion | 1 day |
+| 14 | Polish + AAAI format | 2 days |
 
 ### Known Issues
 - **Airfoil LLM Critic**: crashes on some JSON responses (target field non-numeric). Handled by fallback but needs robustness improvement before production use.

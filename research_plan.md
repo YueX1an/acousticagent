@@ -601,4 +601,81 @@ agent4science/
 - [ ] Hallucination rate annotation (9 LLM Critic outputs collected, need expert review)
 - [ ] Airfoil LLM Critic JSON parsing fixes (target field type errors)
 - [ ] FEM verification of acoustic OOD designs
+- [ ] **AI baselines (B1/B2/B3) — see Section 12**
+- [ ] Paper quality figures (architecture diagram, not just bar charts)
 - [ ] Paper writing (8 pages AAAI format)
+
+---
+
+## 12. Honest Assessment (May 30 Self-Review)
+
+### 12.1 Innovation Checklist: What's Real vs What's Weak
+
+| Innovation | Implemented? | Evidence | Strength |
+|-----------|:---:|------|:---:|
+| **C1**: LLM as Scientific Critic | Partially | Acoustic: LLM = Heuristic (0.894 vs 0.892). No advantage over rules. Concrete: LLM prevents OOD (this IS unique). Airfoil: LLM crashes. | **Medium** |
+| **C2**: Text-to-Math Bridge | Yes | Softplus + dynamic tau + EMA smoothing implemented. Loss backprop verified. Gradient flows correctly. | **Strong** |
+| **C3**: Cross-Domain (3 domains, 0 code changes) | Partially | 3 domains run technically. But LLM Critic unstable on airfoil. H1 (LLM > Heuristic) fails on acoustic. | **Medium** |
+| **C4**: LLM-Surrogate OOD Interaction | **Yes** | Paper's strongest finding. GA/BO chase 113 MPa (+37% above training max). LLM/Heuristic Critic pulls back to 74 MPa. FEM shows NaN at extreme params. | **Very Strong** |
+
+### 12.2 Critical Gaps Identified
+
+#### Gap 1: Missing AI Baselines (MOST URGENT)
+
+Current baselines are all traditional optimization methods (GA, BO, Random). We have **zero AI baselines**. AAAI reviewers will immediately flag:
+
+> "You compare against genetic algorithms and Bayesian optimization. Where are the AI baselines? How does your LLM Critic compare to a pure LLM ReAct Agent doing the same task?"
+
+**Required AI Baselines:**
+
+| # | Baseline | What It Tests | Priority |
+|---|----------|--------------|:---:|
+| **B1** | Pure LLM ReAct Agent | LLM has evaluate_design tool, proposes params, iterates 20x. Compares LLM-as-optimizer vs LLM-as-critic. | **Critical** |
+| **B2** | LLM Critic WITHOUT Text-to-Math bridge | LLM gives unstructured text feedback. Designer runs basic loss function. Tests whether structured JSON bridge matters. | **Critical** |
+| **B3** | LLM backbone comparison | Qwen2.5-14B vs GPT-4o-mini. Tests sensitivity to model capability. | Medium |
+
+#### Gap 2: H1 Failure (LLM = Heuristic on Acoustic)
+
+On the acoustic domain, LLM Critic (0.894) performs identically to Heuristic Critic (0.892). The hypothesis that "LLM reasoning beats hardcoded rules" is **not supported** on our best-tested domain.
+
+**Mitigation**: Reframe the paper. The contribution is NOT "LLM beats rules." The contribution is:
+- C2 (Text-to-Math bridge) — algorithmic contribution
+- C4 (OOD detection) — scientific finding
+- The LLM's value emerges in OOD scenarios, not in routine optimization
+
+#### Gap 3: Figure Quality
+
+Current figures are all matplotlib bar charts. AAAI papers require:
+- Vector architecture diagrams
+- Qualitative examples (LLM reasoning traces)
+- Loss landscape / optimization trajectory visualizations
+- Not just performance bar charts
+
+#### Gap 4: Only 3 Seeds
+
+Current results use 3 seeds per method. For statistical significance, need 10 seeds.
+
+### 12.3 Revised Paper Narrative
+
+**OLD (weak)**: "LLM Critic is better than heuristic rules at inverse design."
+→ Fails because H1 shows no difference on acoustic.
+
+**NEW (strong)**: "LLM-Guided optimization prevents surrogate model OOD errors that deceive traditional optimizers. The LLM's value is not in routine optimization — it's in catching when the surrogate model lies."
+
+**Core evidence for this narrative:**
+1. Concrete: GA/BO chase 113 MPa (OOD false positive). LLM-Guided = 74 MPa (realistic).
+2. Acoustic FEM: Surrogate predicts 0.898. FEM returns NaN at some frequencies — the design is physically problematic.
+3. Ablation A3: Without DomainSpec context, LLM over-refines → structural prompt matters.
+
+### 12.4 Immediate Action Plan
+
+| Step | Action | Time | Must-Do? |
+|------|--------|:---:|:---:|
+| 1 | Implement B1: Pure LLM ReAct Agent baseline | 1h | **Yes** |
+| 2 | Implement B2: LLM Critic without Text-to-Math bridge | 30min | **Yes** |
+| 3 | Run B1+B2 on all 3 domains | 1h | **Yes** |
+| 4 | Fix airfoil LLM Critic JSON stability | 30min | Yes |
+| 5 | Re-run benchmark with 10 seeds | 3h | Yes |
+| 6 | Verify concrete 113 MPa is truly OOD | 1h | **Yes** |
+| 7 | Draw proper architecture diagram (draw.io / TikZ) | 2h | Yes |
+| 8 | Generate qualitative LLM reasoning examples | 1h | Yes |
